@@ -115,8 +115,32 @@ across the year boundary.
 | `0A002637` | 2025-07-06 00:10 | `04 6D` record inside telegram, hundred-year = 0 |
 | `3B173F3C` | 2025-12-31 23:59 | year-rollover, minute before |
 | `00004131` | 2026-01-01 00:00 | year-rollover, minute after — **year advances to 2026** |
+| `00204131` | 2026-01-01 00:00 | real gateway MBTIME of file `_844` (hundred-year bits set) |
+| `00204736` | 2026-06-07 00:00 | real gateway MBTIME of post-wrap file `_001` |
 | `1E084F31` | 2026-01-15 08:30 | representative 2026 value |
 | `80xxxxxx` | *invalid* | IV bit set → reject, don't emit a reading |
+
+### 3.4 Validated against real multi-year gateway files
+
+The decoder was run over seven real snapshot files spanning the year boundary and the
+counter wrap (4,123 `<MEM>` slots total, **zero decode errors**):
+
+| File seq | Gateway `MBTIME` | Decoded | Confirms |
+|---|---|---|---|
+| `_837` | `0020393C` | 2025-12-25 | pre-rollover baseline |
+| `_843` | `00203F3C` | 2025-12-31 | last 2025 file |
+| `_844` | `00204131` | **2026-01-01** | year advances between consecutive files |
+| `_856` | `00204D31` | 2026-01-13 | 2026 continues correctly |
+| `_999` | `00204536` | 2026-06-05 | last file before counter wrap |
+| `_000` | `00204636` | **2026-06-06** | counter restarts at `000`, time keeps increasing |
+| `_001` | `00204736` | 2026-06-07 | post-wrap sequence continues |
+
+Every gateway and slot `MBTIME` in these files carries the hundred-year bits
+(`hy = 1` → 1900 + 100 + yy); only the `04 6D` records inside the meter telegrams rely on
+the ≤ 80 heuristic. Each daily file holds ~589 slots covering a full day of readouts, and
+ordering the files by decoded gateway `MBTIME` yields the correct sequence
+`… 843 → 844 … 999 → 000 → 001` across both the year boundary and the wrap — confirming
+the §5 design.
 
 ## 4. Reference implementation for `mbus_parser.py`
 
@@ -156,8 +180,12 @@ extra range checks are needed beyond the masks.
 
 Each `<MEM>` slot carries the same instant twice: the slot `<MBTIME>` and the `04 6D`
 date/time record inside `<MBTEL>` (decoded independently by `pymeterbus`). The parser
-should compare the two and log a warning when they diverge by more than a few minutes —
-this would have caught the hardcoded-2025 bug immediately in January 2026. Additionally,
+should compare the two and log a warning when they diverge by more than a configurable
+tolerance — this would have caught the hardcoded-2025 bug immediately in January 2026.
+Measured on the real files from §3.4, meter clocks run up to **1 h 41 min** ahead of the
+slot `MBTIME` (poll latency + meter clock drift), so the default tolerance must be ~2 h,
+not minutes; the check targets gross errors (wrong day/month/year), which is exactly the
+failure mode of the original bug. Additionally,
 reject readings whose timestamp is > 24 h in the future relative to the gateway header
 `MBTIME` of the same file (clock-corruption guard).
 
@@ -170,16 +198,22 @@ wrap.
 
 Changes to `STRATEGY.md` §2.2 (ingestion / exactly-once):
 
-1. **Ordering** — process fetched files ordered by decoded gateway `MBTIME` (fallback: FTP
-   `MDTM` mtime), *not* by filename. Never sort lexicographically across a batch.
+1. **Ordering** — process fetched files ordered by decoded gateway `MBTIME`, *not* by
+   filename. Never sort lexicographically across a batch, and never trust filesystem
+   metadata: file mtime is rewritten by every copy/transfer hop and file sizes are near
+   identical (verified on real files: seven snapshots spanning Dec 2025 – Jun 2026 all
+   arrived with one and the same mtime, `2026-07-08 09:15`, and identical byte size).
+   The readout time exists **only inside the file content**.
 2. **Progress tracking** — replace the single "highest sequence number" high-water mark
    with, persisted in the HA `Store`:
    - `last_readout_time`: gateway `MBTIME` of the newest ingested file (drives "is this
      file new?"),
-   - `recent_files`: a bounded map `{filename: (mtime, size)}` of the last ~2 counter
+   - `recent_files`: a bounded map `{filename: gateway_mbtime}` of the last ~2 counter
      periods (~2000 entries) to make re-listing idempotent even when a wrapped counter
      reuses a name like `0080A3DB81A5_042.xml` for *new* content — same name, different
-     mtime/size ⇒ re-ingest.
+     decoded gateway `MBTIME` ⇒ re-ingest. (Content identity, not mtime/size, for the
+     reason in point 1; deciding requires downloading the file, which is acceptable at
+     ~220 KB per candidate and only occurs for names not seen with the same timestamp.)
 3. **Wrap detection for gap reporting only** — sequence numbers remain useful to detect
    *missed* files within one counter period. Treat the counter as modulo-1000: a jump from
    `n` to `m` is a wrap when `(m - n) % 1000` is small and `m < n` (e.g. `999 → 000` or
