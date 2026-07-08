@@ -77,12 +77,19 @@ reference readings on the water meters.
 Everything above is currently **hardcoded** (prices, date windows, device maps) — each quarter
 is a copied notebook. The integration makes all of it configuration.
 
-### 1.4 Known bug to fix during the port
+### 1.4 Known bugs to fix during the port
 
-`playground.py::decode_timestamp` hardcodes **year = 2025** when decoding the CP32 `MBTIME`.
-The integration's parser must decode the year from the CP32 type-F bit fields
-(year = `((byte2 & 0xE0) >> 5) | ((byte3 & 0xF0) >> 1)`, cf. `mbus_date.py`), otherwise all
-2026+ data is mis-dated.
+Two confirmed defects — detailed analysis, verified decoding spec, reference implementation,
+and test vectors in **[`XML_DATETIME_FIX_STRATEGY.md`](XML_DATETIME_FIX_STRATEGY.md)**:
+
+1. `playground.py::decode_timestamp` hardcodes **year = 2025** when decoding the CP32
+   `MBTIME` — all 2026 readings were mis-dated to 2025. The parser must decode the year
+   from the CP32 type-F bit fields
+   (`year = ((byte3 & 0xE0) >> 5) | ((byte4 & 0xF0) >> 1)`, hundred-year in bits 5–6 of
+   the hour byte), mask the minute byte, and honor the IV (invalid) flag.
+2. The file counter `XXX` in `0080A3DB81A5_XXX.xml` is a **3-digit counter that wraps
+   after 999** and restarts low — sequence numbers must never be used as a global
+   ordering or progress key (see §2.2).
 
 ---
 
@@ -116,9 +123,14 @@ Connection settings collected in a standard config flow, options editable later:
 ### 2.2 FTP fetcher + coordinator
 
 - A `DataUpdateCoordinator` drives the poll loop; all network I/O async.
-- **Exactly-once ingestion**: the highest processed sequence number (`XXX` from the filename)
-  is persisted in a HA `Store` (`.storage/energy_meter_izar`), so restarts never re-process
-  files and gaps are backfilled when older files appear.
+- **Exactly-once ingestion, wrap-aware** (the filename counter wraps after 999, so "highest
+  processed sequence number" is *not* a valid high-water mark — see
+  [`XML_DATETIME_FIX_STRATEGY.md`](XML_DATETIME_FIX_STRATEGY.md) §5): files are ordered and
+  gated by their decoded **gateway `MBTIME`**; a HA `Store` (`.storage/energy_meter_izar`)
+  persists the last readout time plus a bounded map of recently processed files
+  (`filename → mtime/size`) so restarts never re-process files, wrapped-counter name reuse
+  is re-ingested, and gaps are backfilled when older files appear. The reading store
+  dedupes on `(device, quantity, timestamp)`, making retries idempotent.
 - Retry with exponential backoff on connection errors; the config entry goes to
   `ConfigEntryNotReady`/reauth flows on persistent failures.
 
@@ -400,7 +412,8 @@ Each phase is a PR into `main`, gated by `validate.yml`.
 
 | Risk | Mitigation |
 |---|---|
-| CP32 year decoding across year boundaries (2025→2026 bug already observed) | Correct type-F decoder + explicit year-rollover unit tests |
+| CP32 year decoding across year boundaries (2025→2026 bug already observed) | Correct type-F decoder + explicit year-rollover unit tests + cross-check MBTIME against the telegram's own `04 6D` record (`XML_DATETIME_FIX_STRATEGY.md` §4.1) |
+| File counter wraps after 999 → high-water mark stalls, filename sort misorders | Order/gate by decoded gateway `MBTIME`; modulo-1000 wrap detection only for gap reporting (`XML_DATETIME_FIX_STRATEGY.md` §5) |
 | Meter resets / counter overflows → negative diffs | Filter negatives (as today) + log a repair issue when detected |
 | FTP flakiness / partial uploads | `.rdy`-marker gating, retry with backoff, high-water mark makes retries idempotent |
 | Gateway deletes/rotates old files | Poll interval well below rotation period; document gateway retention |
