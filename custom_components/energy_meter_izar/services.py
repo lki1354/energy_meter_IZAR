@@ -115,7 +115,11 @@ def _write_bills(
     paths = []
     for fmt in formats:
         path = bills_dir / f"{stem}.{FILE_EXTENSIONS[fmt]}"
-        path.write_text(render_bill(result, profile, fmt), encoding="utf-8")
+        content = render_bill(result, profile, fmt)
+        if isinstance(content, bytes):
+            path.write_bytes(content)
+        else:
+            path.write_text(content, encoding="utf-8")
         paths.append(str(path))
     return paths
 

@@ -80,7 +80,7 @@ def test_strategy_example_parses(tmp_path):
     assert hochtarif.windows[1].start_minute == 7 * 60
     assert hochtarif.windows[1].end_minute == 13 * 60
 
-    # profiles, including the not-yet-renderable pdf format
+    # profiles
     assert config.profiles["quarterly_full"].formats == ("markdown", "csv", "pdf")
     assert config.profiles["water_only"].sections == ("water_volume",)
     assert config.default_profile.name == "quarterly_full"

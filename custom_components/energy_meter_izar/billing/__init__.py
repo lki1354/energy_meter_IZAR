@@ -9,22 +9,23 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from .config import FORMAT_CSV, FORMAT_MARKDOWN, Profile
+from .config import FORMAT_CSV, FORMAT_MARKDOWN, FORMAT_PDF, Profile
 from .engine import BillResult
 from .render_csv import render_csv
 from .render_markdown import render_markdown
+from .render_pdf import render_pdf
 
-#: Formats that can actually be rendered today. PDF (accepted by the config
-#: schema for forward compatibility) joins in a later release.
-RENDERERS: dict[str, Callable[[BillResult, Profile], str]] = {
+#: Text renderers return ``str``, binary renderers (PDF) return ``bytes``.
+RENDERERS: dict[str, Callable[[BillResult, Profile], str | bytes]] = {
     FORMAT_MARKDOWN: render_markdown,
     FORMAT_CSV: render_csv,
+    FORMAT_PDF: render_pdf,
 }
 
-FILE_EXTENSIONS = {FORMAT_MARKDOWN: "md", FORMAT_CSV: "csv"}
+FILE_EXTENSIONS = {FORMAT_MARKDOWN: "md", FORMAT_CSV: "csv", FORMAT_PDF: "pdf"}
 
 
-def render_bill(result: BillResult, profile: Profile, fmt: str) -> str:
+def render_bill(result: BillResult, profile: Profile, fmt: str) -> str | bytes:
     """Render a computed bill in the given format."""
     try:
         renderer = RENDERERS[fmt]

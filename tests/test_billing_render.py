@@ -1,10 +1,11 @@
-"""Tests for the Markdown and CSV bill renderers."""
+"""Tests for the Markdown, CSV, and PDF bill renderers."""
 
 import csv
 import datetime as dt
 import io
 
 import pytest
+from pypdf import PdfReader
 
 from custom_components.energy_meter_izar.billing import render_bill
 from custom_components.energy_meter_izar.billing.config import Profile
@@ -17,6 +18,7 @@ from custom_components.energy_meter_izar.billing.engine import (
 )
 from custom_components.energy_meter_izar.billing.render_csv import render_csv
 from custom_components.energy_meter_izar.billing.render_markdown import render_markdown
+from custom_components.energy_meter_izar.billing.render_pdf import render_pdf
 
 
 def _result() -> BillResult:
@@ -133,8 +135,46 @@ def test_csv_water_volume_section():
     assert float(hot[4]) == pytest.approx(12.5)
 
 
+def _pdf_text(data: bytes) -> str:
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() for page in reader.pages)
+
+
+def test_pdf_full_bill_german():
+    data = render_pdf(_result(), FULL_PROFILE)
+    assert data.startswith(b"%PDF-")
+    text = _pdf_text(data)
+    assert "Energieabrechnung" in text
+    assert "2026-01-01 - 2026-04-01" in text
+    assert "Strom hochtarif (Netz)" in text
+    assert "22.18 CHF" in text
+    # unit total = 22.18+10.14+2.64+2.10+0.44+22.0+9.6 = 69.10
+    assert "69.10 CHF" in text
+    assert "Zusammenfassung" in text
+    assert "Heizungsanteil Wärmepumpe: 60.0%" in text
+    assert "PV-Produktion: 120.00 kWh" in text
+
+
+def test_pdf_water_only_english():
+    profile = Profile(name="water_only", sections=("water_volume",), language="en")
+    text = _pdf_text(render_pdf(_result(), profile))
+    assert "Water consumption" in text
+    assert "12.500" in text
+    assert "30.250" in text
+    assert "hochtarif (grid)" not in text
+
+
+def test_pdf_survives_non_latin1_notes():
+    result = _result()
+    result.meta.notes.append("Zähler 2800001 → reset erkannt — Werte geprüft ⚠️")
+    text = _pdf_text(render_pdf(result, FULL_PROFILE))
+    # en dash / warning sign are substituted, the rest survives
+    assert "Werte geprüft" in text
+
+
 def test_render_bill_dispatch():
     assert render_bill(_result(), FULL_PROFILE, "markdown").startswith("# ")
     assert render_bill(_result(), FULL_PROFILE, "csv").startswith("unit,")
-    with pytest.raises(ValueError, match="pdf"):
-        render_bill(_result(), FULL_PROFILE, "pdf")
+    assert render_bill(_result(), FULL_PROFILE, "pdf").startswith(b"%PDF-")
+    with pytest.raises(ValueError, match="docx"):
+        render_bill(_result(), FULL_PROFILE, "docx")

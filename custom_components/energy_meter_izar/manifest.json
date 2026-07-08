@@ -9,6 +9,11 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/lki1354/energy_meter_IZAR/issues",
   "loggers": ["meterbus", "aioftp", "asyncssh"],
-  "requirements": ["pyMeterBus>=0.8.4", "aioftp>=0.22.0", "asyncssh>=2.14.0"],
-  "version": "0.4.0"
+  "requirements": [
+    "pyMeterBus>=0.8.4",
+    "aioftp>=0.22.0",
+    "asyncssh>=2.14.0",
+    "fpdf2>=2.8.0"
+  ],
+  "version": "1.0.0"
 }

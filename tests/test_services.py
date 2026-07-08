@@ -160,10 +160,13 @@ async def test_generate_bill_without_billing_yaml_uses_defaults(hass, fixtures_d
     response = await _generate(hass, start="2026-06-01", end="2026-06-15")
     files = response["files"]
     assert response["profile"] == "quarterly_full"
-    assert len(files) == 2
+    assert len(files) == 3
     text = Path(files[0]).read_text(encoding="utf-8")
     assert "EG" in text
     assert "hochtarif" in text
+    pdf = Path(files[2])
+    assert pdf.suffix == ".pdf"
+    assert pdf.read_bytes().startswith(b"%PDF-")
 
 
 async def test_generate_bill_end_before_start_rejected(hass, fixtures_dir):
@@ -179,10 +182,23 @@ async def test_generate_bill_unknown_profile_rejected(hass, fixtures_dir):
         await _generate(hass, profile="nope")
 
 
-async def test_generate_bill_pdf_not_yet_supported(hass, fixtures_dir):
+async def test_generate_bill_pdf(hass, fixtures_dir):
+    entry = await _setup(hass, fixtures_dir)
+    await _seed_readings(hass, entry)
+    _write_billing_yaml(hass)
+
+    response = await _generate(hass, profile="simple", formats=["pdf"])
+    files = response["files"]
+    assert len(files) == 1
+    pdf = Path(files[0])
+    assert pdf.name == "2026-06-01_2026-07-01_simple.pdf"
+    assert pdf.read_bytes().startswith(b"%PDF-")
+
+
+async def test_generate_bill_unsupported_format_rejected(hass, fixtures_dir):
     await _setup(hass, fixtures_dir)
     with pytest.raises(ServiceValidationError):
-        await _generate(hass, formats=["pdf"])
+        await _generate(hass, formats=["docx"])
 
 
 async def test_generate_bill_requires_loaded_entry(hass, fixtures_dir):

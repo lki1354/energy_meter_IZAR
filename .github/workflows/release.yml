@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and attach HACS zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp release version into manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" '.version = $v' \
+            custom_components/energy_meter_izar/manifest.json > m.json \
+            && mv m.json custom_components/energy_meter_izar/manifest.json
+
+      - name: Build zip artifact
+        run: |
+          cd custom_components/energy_meter_izar
+          zip -r ../../energy_meter_izar.zip .
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: energy_meter_izar.zip
