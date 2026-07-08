@@ -1,3 +1,6 @@
 pymeterbus>=0.8.4
+aioftp>=0.22.0
+asyncssh>=2.14.0
 pytest>=8.0
+pytest-homeassistant-custom-component>=0.13.300
 ruff>=0.8

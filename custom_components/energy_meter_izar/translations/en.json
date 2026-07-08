@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the M-Bus gateway file server",
+        "description": "The gateway uploads HC2XML snapshot files to an FTP/SFTP server; enter its connection details.",
+        "data": {
+          "protocol": "Protocol",
+          "host": "Host",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password",
+          "directory": "Remote directory"
+        },
+        "data_description": {
+          "port": "Leave empty for the protocol default (21 for FTP/FTPS, 22 for SFTP).",
+          "directory": "Directory containing the snapshot files, e.g. /mbus."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update file server credentials",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the file server",
+      "invalid_auth": "Invalid username or password",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This server and directory are already configured",
+      "reauth_successful": "Credentials updated successfully"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Polling options",
+        "data": {
+          "poll_interval": "Poll interval",
+          "file_pattern": "Snapshot file pattern",
+          "require_rdy": "Wait for .rdy marker file",
+          "delete_after": "Delete files from server after processing"
+        },
+        "data_description": {
+          "file_pattern": "Glob pattern of the gateway snapshot files, e.g. 0080A3DB81A5_*.xml.",
+          "require_rdy": "Only ingest a snapshot once its matching .rdy marker exists, so half-uploaded files are never read."
+        }
+      }
+    }
+  },
+  "selector": {
+    "protocol": {
+      "options": {
+        "ftp": "FTP",
+        "ftps": "FTPS (implicit TLS)",
+        "sftp": "SFTP (SSH)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy": { "name": "Energy" },
+      "energy_2": { "name": "Energy 2" },
+      "energy_3": { "name": "Energy 3" },
+      "energy_4": { "name": "Energy 4" },
+      "power_l1": { "name": "Power L1" },
+      "power_l2": { "name": "Power L2" },
+      "power_l3": { "name": "Power L3" },
+      "voltage_l1": { "name": "Voltage L1" },
+      "voltage_l2": { "name": "Voltage L2" },
+      "voltage_l3": { "name": "Voltage L3" },
+      "current_l1": { "name": "Current L1" },
+      "current_l2": { "name": "Current L2" },
+      "current_l3": { "name": "Current L3" },
+      "volume": { "name": "Volume" },
+      "flow_temperature": { "name": "Flow temperature" },
+      "return_temperature": { "name": "Return temperature" },
+      "flow_rate": { "name": "Flow rate" },
+      "power": { "name": "Power" },
+      "on_time": { "name": "On time" },
+      "error_code": { "name": "Error code" },
+      "mbus_status": { "name": "M-Bus status" },
+      "last_reading": { "name": "Last reading" },
+      "last_readout": { "name": "Last readout" },
+      "bus_voltage": { "name": "Bus voltage" },
+      "bus_current": { "name": "Bus current" }
+    }
+  }
+}

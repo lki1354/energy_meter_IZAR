@@ -1,0 +1,13 @@
+{
+  "domain": "energy_meter_izar",
+  "name": "Energy Meter IZAR (M-Bus FTP)",
+  "codeowners": ["@lki1354"],
+  "config_flow": true,
+  "documentation": "https://github.com/lki1354/energy_meter_IZAR",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/lki1354/energy_meter_IZAR/issues",
+  "loggers": ["meterbus", "aioftp", "asyncssh"],
+  "requirements": ["pyMeterBus>=0.8.4", "aioftp>=0.22.0", "asyncssh>=2.14.0"],
+  "version": "0.2.0"
+}

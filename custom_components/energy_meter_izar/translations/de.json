@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit dem M-Bus-Gateway-Dateiserver verbinden",
+        "description": "Das Gateway lädt HC2XML-Snapshot-Dateien auf einen FTP/SFTP-Server; hier die Verbindungsdaten eingeben.",
+        "data": {
+          "protocol": "Protokoll",
+          "host": "Host",
+          "port": "Port",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "directory": "Remote-Verzeichnis"
+        },
+        "data_description": {
+          "port": "Leer lassen für den Protokoll-Standard (21 für FTP/FTPS, 22 für SFTP).",
+          "directory": "Verzeichnis mit den Snapshot-Dateien, z. B. /mbus."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Zugangsdaten zum Dateiserver aktualisieren",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Dateiserver fehlgeschlagen",
+      "invalid_auth": "Benutzername oder Passwort ungültig",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "abort": {
+      "already_configured": "Dieser Server und dieses Verzeichnis sind bereits eingerichtet",
+      "reauth_successful": "Zugangsdaten erfolgreich aktualisiert"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Abruf-Optionen",
+        "data": {
+          "poll_interval": "Abrufintervall",
+          "file_pattern": "Dateimuster der Snapshots",
+          "require_rdy": "Auf .rdy-Markerdatei warten",
+          "delete_after": "Dateien nach Verarbeitung vom Server löschen"
+        },
+        "data_description": {
+          "file_pattern": "Glob-Muster der Gateway-Snapshot-Dateien, z. B. 0080A3DB81A5_*.xml.",
+          "require_rdy": "Snapshot erst einlesen, wenn die zugehörige .rdy-Markerdatei existiert, damit nie halb hochgeladene Dateien gelesen werden."
+        }
+      }
+    }
+  },
+  "selector": {
+    "protocol": {
+      "options": {
+        "ftp": "FTP",
+        "ftps": "FTPS (implizites TLS)",
+        "sftp": "SFTP (SSH)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy": { "name": "Energie" },
+      "energy_2": { "name": "Energie 2" },
+      "energy_3": { "name": "Energie 3" },
+      "energy_4": { "name": "Energie 4" },
+      "power_l1": { "name": "Leistung L1" },
+      "power_l2": { "name": "Leistung L2" },
+      "power_l3": { "name": "Leistung L3" },
+      "voltage_l1": { "name": "Spannung L1" },
+      "voltage_l2": { "name": "Spannung L2" },
+      "voltage_l3": { "name": "Spannung L3" },
+      "current_l1": { "name": "Strom L1" },
+      "current_l2": { "name": "Strom L2" },
+      "current_l3": { "name": "Strom L3" },
+      "volume": { "name": "Volumen" },
+      "flow_temperature": { "name": "Vorlauftemperatur" },
+      "return_temperature": { "name": "Rücklauftemperatur" },
+      "flow_rate": { "name": "Durchfluss" },
+      "power": { "name": "Leistung" },
+      "on_time": { "name": "Betriebszeit" },
+      "error_code": { "name": "Fehlercode" },
+      "mbus_status": { "name": "M-Bus-Status" },
+      "last_reading": { "name": "Letzter Messwert" },
+      "last_readout": { "name": "Letzte Auslesung" },
+      "bus_voltage": { "name": "Busspannung" },
+      "bus_current": { "name": "Busstrom" }
+    }
+  }
+}
