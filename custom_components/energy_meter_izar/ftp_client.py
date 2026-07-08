@@ -8,9 +8,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import datetime as dt
 import ssl
 from dataclasses import dataclass
 from typing import Protocol
+
+# Imported at module level on purpose: Home Assistant loads integration
+# modules in the import executor, while a lazy import inside the async
+# methods would block the event loop on first use (importlib reads package
+# metadata from disk). See
+# https://developers.home-assistant.io/docs/asyncio_blocking_operations/
+import aioftp
+import asyncssh
 
 #: Seconds to wait for the TCP/TLS/SSH connection to be established.
 CONNECT_TIMEOUT = 30.0
@@ -82,8 +91,6 @@ class FtpClient:
         self._client = None
 
     async def connect(self) -> None:
-        import aioftp
-
         tls = ssl.create_default_context() if self._config.protocol == "ftps" else None
         client = aioftp.Client(
             ssl=tls,
@@ -107,8 +114,6 @@ class FtpClient:
         self._client = client
 
     async def list_files(self) -> list[RemoteFileInfo]:
-        import aioftp
-
         assert self._client is not None
         files: list[RemoteFileInfo] = []
         try:
@@ -131,8 +136,6 @@ class FtpClient:
         return files
 
     async def download(self, name: str) -> bytes:
-        import aioftp
-
         assert self._client is not None
         chunks: list[bytes] = []
         try:
@@ -146,8 +149,6 @@ class FtpClient:
         return b"".join(chunks)
 
     async def delete(self, name: str) -> None:
-        import aioftp
-
         assert self._client is not None
         try:
             await self._client.remove_file(name)
@@ -174,8 +175,6 @@ class SftpClient:
         self._sftp = None
 
     async def connect(self) -> None:
-        import asyncssh
-
         try:
             self._conn = await asyncssh.connect(
                 self._config.host,
@@ -195,8 +194,6 @@ class SftpClient:
             raise FetchError(f"cannot connect to {self._config.host}: {err}") from err
 
     async def list_files(self) -> list[RemoteFileInfo]:
-        import asyncssh
-
         assert self._sftp is not None
         files: list[RemoteFileInfo] = []
         try:
@@ -220,8 +217,6 @@ class SftpClient:
         return files
 
     async def download(self, name: str) -> bytes:
-        import asyncssh
-
         assert self._sftp is not None
         try:
             async with asyncio.timeout(SOCKET_TIMEOUT):
@@ -233,8 +228,6 @@ class SftpClient:
             raise FetchError(f"download of {name!r} failed: {err}") from err
 
     async def delete(self, name: str) -> None:
-        import asyncssh
-
         assert self._sftp is not None
         try:
             async with asyncio.timeout(SOCKET_TIMEOUT):
@@ -264,8 +257,6 @@ def _mlsd_time_to_epoch(modify: str | None) -> float | None:
     """Convert an MLSD ``modify`` fact (``YYYYMMDDHHMMSS``, UTC) to a UNIX epoch."""
     if not modify:
         return None
-    import datetime as dt
-
     try:
         parsed = dt.datetime.strptime(modify[:14], "%Y%m%d%H%M%S")
     except ValueError:
