@@ -26,3 +26,8 @@ DEFAULT_DELETE_AFTER = False
 
 STORAGE_VERSION = 1
 STORAGE_KEY_TEMPLATE = f"{DOMAIN}.{{entry_id}}"
+
+#: SQLite archive of every decoded reading, under /config/energy_meter_izar/.
+#: Billing (phase 4) queries arbitrary past periods from this file, so it is
+#: deliberately kept out of HA's recorder database and its purge cycle.
+READINGS_DB_FILENAME = "readings.db"
