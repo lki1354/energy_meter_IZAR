@@ -61,6 +61,47 @@
       }
     }
   },
+  "services": {
+    "generate_bill": {
+      "name": "Generate energy bill",
+      "description": "Computes the energy bill for a period from the stored meter readings and writes it to /config/energy_meter_izar/bills/.",
+      "fields": {
+        "start": {
+          "name": "Start date",
+          "description": "First day of the billing period (inclusive)."
+        },
+        "end": {
+          "name": "End date",
+          "description": "End of the billing period (exclusive), e.g. 2026-04-01 for a bill through March."
+        },
+        "profile": {
+          "name": "Profile",
+          "description": "Name of the export profile from billing.yaml. Defaults to the first configured profile."
+        },
+        "formats": {
+          "name": "Formats",
+          "description": "Output formats, overriding the profile's formats."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "no_entry_loaded": {
+      "message": "No Energy Meter IZAR gateway is set up and loaded."
+    },
+    "invalid_period": {
+      "message": "The billing period end ({end}) must be after its start ({start})."
+    },
+    "invalid_billing_config": {
+      "message": "billing.yaml is invalid: {error}"
+    },
+    "unknown_profile": {
+      "message": "Unknown billing profile \"{profile}\"; configured profiles: {profiles}."
+    },
+    "no_supported_format": {
+      "message": "None of the requested formats ({requested}) can be rendered yet; supported: {supported}."
+    }
+  },
   "entity": {
     "sensor": {
       "energy": { "name": "Energy" },

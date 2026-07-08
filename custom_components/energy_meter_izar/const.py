@@ -28,6 +28,18 @@ STORAGE_VERSION = 1
 STORAGE_KEY_TEMPLATE = f"{DOMAIN}.{{entry_id}}"
 
 #: SQLite archive of every decoded reading, under /config/energy_meter_izar/.
-#: Billing (phase 4) queries arbitrary past periods from this file, so it is
+#: Billing queries arbitrary past periods from this file, so it is
 #: deliberately kept out of HA's recorder database and its purge cycle.
 READINGS_DB_FILENAME = "readings.db"
+
+#: Billing configuration and bill output, under /config/energy_meter_izar/.
+BILLING_CONFIG_FILENAME = "billing.yaml"
+BILLS_SUBDIR = "bills"
+
+SERVICE_GENERATE_BILL = "generate_bill"
+ATTR_START = "start"
+ATTR_END = "end"
+ATTR_PROFILE = "profile"
+ATTR_FORMATS = "formats"
+
+EVENT_BILL_GENERATED = f"{DOMAIN}_bill_generated"

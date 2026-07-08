@@ -61,6 +61,47 @@
       }
     }
   },
+  "services": {
+    "generate_bill": {
+      "name": "Energieabrechnung erstellen",
+      "description": "Berechnet die Energieabrechnung für einen Zeitraum aus den gespeicherten Zählerständen und schreibt sie nach /config/energy_meter_izar/bills/.",
+      "fields": {
+        "start": {
+          "name": "Startdatum",
+          "description": "Erster Tag des Abrechnungszeitraums (inklusive)."
+        },
+        "end": {
+          "name": "Enddatum",
+          "description": "Ende des Abrechnungszeitraums (exklusiv), z. B. 2026-04-01 für eine Abrechnung bis Ende März."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Name des Export-Profils aus billing.yaml. Standard ist das erste konfigurierte Profil."
+        },
+        "formats": {
+          "name": "Formate",
+          "description": "Ausgabeformate, überschreibt die Formate des Profils."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "no_entry_loaded": {
+      "message": "Es ist kein Energy Meter IZAR Gateway eingerichtet und geladen."
+    },
+    "invalid_period": {
+      "message": "Das Ende des Abrechnungszeitraums ({end}) muss nach dem Beginn ({start}) liegen."
+    },
+    "invalid_billing_config": {
+      "message": "billing.yaml ist ungültig: {error}"
+    },
+    "unknown_profile": {
+      "message": "Unbekanntes Abrechnungsprofil \"{profile}\"; konfigurierte Profile: {profiles}."
+    },
+    "no_supported_format": {
+      "message": "Keines der angeforderten Formate ({requested}) kann bereits erzeugt werden; unterstützt: {supported}."
+    }
+  },
   "entity": {
     "sensor": {
       "energy": { "name": "Energie" },

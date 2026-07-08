@@ -1,0 +1,24 @@
+generate_bill:
+  fields:
+    start:
+      required: true
+      example: "2026-01-01"
+      selector:
+        date:
+    end:
+      required: true
+      example: "2026-04-01"
+      selector:
+        date:
+    profile:
+      example: quarterly_full
+      selector:
+        text:
+    formats:
+      example: "[markdown, csv]"
+      selector:
+        select:
+          multiple: true
+          options:
+            - markdown
+            - csv
