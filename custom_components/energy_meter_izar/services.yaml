@@ -15,10 +15,11 @@ generate_bill:
       selector:
         text:
     formats:
-      example: "[markdown, csv]"
+      example: "[markdown, csv, pdf]"
       selector:
         select:
           multiple: true
           options:
             - markdown
             - csv
+            - pdf

@@ -38,8 +38,6 @@ SECTIONS = (
 
 FORMAT_MARKDOWN = "markdown"
 FORMAT_CSV = "csv"
-#: Accepted in configuration for forward compatibility; rendering support
-#: for PDF lands in a later release (phase 5).
 FORMAT_PDF = "pdf"
 FORMATS = (FORMAT_MARKDOWN, FORMAT_CSV, FORMAT_PDF)
 
@@ -403,7 +401,7 @@ def default_billing_config() -> BillingConfig:
                         SECTION_SUMMARY,
                     ],
                     "language": "de",
-                    "formats": [FORMAT_MARKDOWN, FORMAT_CSV],
+                    "formats": [FORMAT_MARKDOWN, FORMAT_CSV, FORMAT_PDF],
                 },
                 "water_only": {
                     "sections": [SECTION_WATER_VOLUME],

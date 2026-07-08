@@ -1,0 +1,6 @@
+{
+  "name": "Energy Meter IZAR (M-Bus FTP)",
+  "zip_release": true,
+  "filename": "energy_meter_izar.zip",
+  "homeassistant": "2025.6.0"
+}
