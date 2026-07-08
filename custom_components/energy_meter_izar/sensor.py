@@ -281,6 +281,8 @@ async def async_setup_entry(
 
     @callback
     def _sync_meters() -> None:
+        if coordinator.data is None:  # first background poll not done yet
+            return
         new_entities: list[SensorEntity] = []
         for number, state in coordinator.data.meters.items():
             if number in known_meters:
@@ -324,7 +326,13 @@ class IzarGatewaySensor(CoordinatorEntity[IzarCoordinator], SensorEntity):
         )
 
     @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.data is not None
+
+    @property
     def native_value(self) -> Any:
+        if self.coordinator.data is None:
+            return None
         return self.entity_description.value_fn(self.coordinator)
 
 
