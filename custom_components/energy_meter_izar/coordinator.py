@@ -29,12 +29,15 @@ from .const import (
     DEFAULT_POLL_INTERVAL_MINUTES,
     DEFAULT_REQUIRE_RDY,
     DOMAIN,
+    READINGS_DB_FILENAME,
     STORAGE_KEY_TEMPLATE,
     STORAGE_VERSION,
 )
 from .ftp_client import ConnectionConfig, FetchAuthError, FetchError, create_client
 from .ingest import IngestionTracker, SequenceWatcher
 from .pipeline import PollResult, SnapshotPipeline
+from .statistics import StatisticsImporter
+from .store import ReadingStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +65,8 @@ class IzarCoordinator(DataUpdateCoordinator[PollResult]):
             hass, STORAGE_VERSION, STORAGE_KEY_TEMPLATE.format(entry_id=entry.entry_id)
         )
         self._pipeline: SnapshotPipeline | None = None
+        self.reading_store: ReadingStore | None = None
+        self._statistics: StatisticsImporter | None = None
 
     @property
     def connection_config(self) -> ConnectionConfig:
@@ -86,6 +91,13 @@ class IzarCoordinator(DataUpdateCoordinator[PollResult]):
             require_rdy=options.get(CONF_REQUIRE_RDY, DEFAULT_REQUIRE_RDY),
             delete_after=options.get(CONF_DELETE_AFTER, DEFAULT_DELETE_AFTER),
         )
+        # Billing source of truth, independent of recorder purge settings.
+        self.reading_store = await self.hass.async_add_executor_job(
+            ReadingStore, self.hass.config.path(DOMAIN, READINGS_DB_FILENAME)
+        )
+        self._statistics = StatisticsImporter(
+            self.hass, self.reading_store, self._pipeline.device_map
+        )
 
     async def _async_update_data(self) -> PollResult:
         assert self._pipeline is not None
@@ -108,6 +120,10 @@ class IzarCoordinator(DataUpdateCoordinator[PollResult]):
                 len(result.files_ingested),
                 ", ".join(result.files_ingested),
             )
+            await self._archive_and_import(result)
+            # Persist the tracker only after the readings hit the database;
+            # a crash in between re-ingests the files, which the store's
+            # (device, quantity, timestamp) dedupe makes harmless.
             await self._store.async_save(
                 {
                     "tracker": self._pipeline.tracker.to_dict(),
@@ -115,3 +131,19 @@ class IzarCoordinator(DataUpdateCoordinator[PollResult]):
                 }
             )
         return result
+
+    async def _archive_and_import(self, result: PollResult) -> None:
+        assert self.reading_store is not None and self._statistics is not None
+        if not result.new_readings:
+            return
+        added = await self.hass.async_add_executor_job(
+            self.reading_store.add_readings, result.new_readings
+        )
+        if added:
+            await self._statistics.async_import_new(result.new_readings)
+
+    async def async_close(self) -> None:
+        """Release the reading store (on entry unload)."""
+        if self.reading_store is not None:
+            await self.hass.async_add_executor_job(self.reading_store.close)
+            self.reading_store = None

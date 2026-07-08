@@ -57,6 +57,10 @@ class PollResult:
     files_ingested: list[str] = field(default_factory=list)
     files_missing: int = 0
     warnings: list[str] = field(default_factory=list)
+    #: Every reading decoded from the files ingested in this cycle (not just
+    #: the latest per quantity) — the coordinator archives these in the
+    #: reading store and derives statistics from them.
+    new_readings: list[MeterReading] = field(default_factory=list)
 
 
 class SnapshotPipeline:
@@ -108,6 +112,7 @@ class SnapshotPipeline:
         for gateway_time, info, parse in pending:
             self._observe_sequence(info.name, result)
             self._apply_readings(parse.readings)
+            result.new_readings.extend(parse.readings)
             for warning in parse.warnings:
                 result.warnings.append(f"{info.name}: {warning}")
             self.tracker.mark_ingested(

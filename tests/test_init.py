@@ -33,8 +33,22 @@ ENTRY_DATA = {
 
 
 @pytest.fixture(autouse=True)
-def _custom_integrations(enable_custom_integrations):
+def _recorder(recorder_mock):
+    """The integration declares recorder as a manifest dependency."""
     return
+
+
+@pytest.fixture(autouse=True)
+def _custom_integrations(_recorder, enable_custom_integrations):
+    # depends on _recorder so the recorder database is initialized before
+    # anything touches the hass fixture
+    return
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config_dir(_recorder, hass, tmp_path):
+    """Keep readings.db out of the shared testing config dir."""
+    hass.config.config_dir = str(tmp_path)
 
 
 def _fixture_client(fixtures_dir, *names: str) -> FakeRemoteClient:

@@ -37,7 +37,15 @@ ENTRY_DATA = {**USER_INPUT, CONF_PORT: 21}
 
 
 @pytest.fixture(autouse=True)
-def _custom_integrations(enable_custom_integrations):
+def _recorder(recorder_mock):
+    """recorder is a manifest dependency, set up even with setup mocked."""
+    return
+
+
+@pytest.fixture(autouse=True)
+def _custom_integrations(_recorder, enable_custom_integrations):
+    # depends on _recorder so the recorder database is initialized before
+    # anything touches the hass fixture
     return
 
 
