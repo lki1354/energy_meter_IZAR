@@ -116,7 +116,8 @@ async def _setup(hass, tmp_path, client) -> MockConfigEntry:
     entry.add_to_hass(hass)
     with _patch_client(client):
         await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
+        # the first poll runs as a background task right after setup
+        await hass.async_block_till_done(wait_background_tasks=True)
     await async_wait_recording_done(hass)
     return entry
 
@@ -240,7 +241,7 @@ class TestBackfill:
         await hass.async_block_till_done()
         with _patch_client(client):
             await hass.config_entries.async_setup(entry.entry_id)
-            await hass.async_block_till_done()
+            await hass.async_block_till_done(wait_background_tasks=True)
         await async_wait_recording_done(hass)
 
         assert await _get_stats(hass, EG_ENERGY) == before

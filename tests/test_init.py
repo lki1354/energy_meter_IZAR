@@ -73,7 +73,8 @@ async def _setup(hass, client) -> MockConfigEntry:
     entry.add_to_hass(hass)
     with _patch_client(client):
         await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
+        # the first poll runs as a background task right after setup
+        await hass.async_block_till_done(wait_background_tasks=True)
     return entry
 
 

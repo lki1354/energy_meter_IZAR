@@ -28,11 +28,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: IzarConfigEntry) -> bool:
     """Set up the gateway poller from a config entry."""
     coordinator = IzarCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    await coordinator.async_initialize()
     entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    # The first poll may chew through a large file backlog and take minutes;
+    # run it outside the setup so a restart or reload cannot cancel the entry
+    # mid-download and Home Assistant startup is not delayed.
+    entry.async_create_background_task(
+        hass, coordinator.async_refresh(), f"{DOMAIN} first poll"
+    )
     return True
 
 

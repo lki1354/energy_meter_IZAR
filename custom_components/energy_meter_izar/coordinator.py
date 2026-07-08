@@ -13,7 +13,7 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -80,8 +80,17 @@ class IzarCoordinator(DataUpdateCoordinator[PollResult]):
             directory=entry.data[CONF_DIRECTORY],
         )
 
-    async def _async_setup(self) -> None:
-        """Restore ingestion bookkeeping from disk before the first poll."""
+    async def async_initialize(self) -> None:
+        """Restore bookkeeping from disk and verify the gateway is reachable.
+
+        Runs during config entry setup in place of a full first refresh:
+        ingesting the file backlog can take minutes on the gateway's slow
+        embedded FTP server, and a setup still running on shutdown or reload
+        would be cancelled mid-download. Setup therefore only proves
+        connectivity (wrong credentials still fail fast into reauth, an
+        unreachable host into setup retry); the first real poll runs as a
+        background task right after setup.
+        """
         options = self.config_entry.options
         stored = await self._store.async_load() or {}
         self._pipeline = SnapshotPipeline(
@@ -98,6 +107,16 @@ class IzarCoordinator(DataUpdateCoordinator[PollResult]):
         self._statistics = StatisticsImporter(
             self.hass, self.reading_store, self._pipeline.device_map
         )
+
+        client = create_client(self.connection_config)
+        try:
+            await client.connect()
+        except FetchAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except FetchError as err:
+            raise ConfigEntryNotReady(str(err)) from err
+        finally:
+            await client.close()
 
     async def _async_update_data(self) -> PollResult:
         assert self._pipeline is not None
