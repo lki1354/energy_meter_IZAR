@@ -6,10 +6,20 @@ Pure Python, no Home Assistant imports — the coordinator consumes the
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import ssl
 from dataclasses import dataclass
 from typing import Protocol
+
+#: Seconds to wait for the TCP/TLS/SSH connection to be established.
+CONNECT_TIMEOUT = 30.0
+
+#: Seconds a single protocol read/write may stall before the session is
+#: declared dead. The IZAR gateway's embedded FTP server occasionally stops
+#: answering on the control channel; without this bound a poll would hang
+#: forever and Home Assistant would cancel the config entry setup.
+SOCKET_TIMEOUT = 60.0
 
 
 class FetchError(Exception):
@@ -75,7 +85,11 @@ class FtpClient:
         import aioftp
 
         tls = ssl.create_default_context() if self._config.protocol == "ftps" else None
-        client = aioftp.Client(ssl=tls)
+        client = aioftp.Client(
+            ssl=tls,
+            connection_timeout=CONNECT_TIMEOUT,
+            socket_timeout=SOCKET_TIMEOUT,
+        )
         try:
             await client.connect(self._config.host, self._config.port)
             await client.login(self._config.username, self._config.password)
@@ -84,6 +98,10 @@ class FtpClient:
             if any(code.matches("530") for code in err.received_codes):
                 raise FetchAuthError(f"login rejected: {err}") from err
             raise FetchError(f"FTP error: {err}") from err
+        except TimeoutError as err:
+            raise FetchError(
+                f"{self._config.host} did not respond within {CONNECT_TIMEOUT:.0f}s"
+            ) from err
         except (OSError, ssl.SSLError, ConnectionError) as err:
             raise FetchError(f"cannot connect to {self._config.host}: {err}") from err
         self._client = client
@@ -106,6 +124,8 @@ class FtpClient:
                         mtime=_mlsd_time_to_epoch(modify),
                     )
                 )
+        except TimeoutError as err:
+            raise FetchError(_timeout_message("listing")) from err
         except (aioftp.StatusCodeError, OSError, ConnectionError) as err:
             raise FetchError(f"listing failed: {err}") from err
         return files
@@ -119,6 +139,8 @@ class FtpClient:
             async with self._client.download_stream(name) as stream:
                 async for block in stream.iter_by_block():
                     chunks.append(block)
+        except TimeoutError as err:
+            raise FetchError(_timeout_message(f"download of {name!r}")) from err
         except (aioftp.StatusCodeError, OSError, ConnectionError) as err:
             raise FetchError(f"download of {name!r} failed: {err}") from err
         return b"".join(chunks)
@@ -129,6 +151,8 @@ class FtpClient:
         assert self._client is not None
         try:
             await self._client.remove_file(name)
+        except TimeoutError as err:
+            raise FetchError(_timeout_message(f"delete of {name!r}")) from err
         except (aioftp.StatusCodeError, OSError, ConnectionError) as err:
             raise FetchError(f"delete of {name!r} failed: {err}") from err
 
@@ -136,7 +160,8 @@ class FtpClient:
         if self._client is None:
             return
         with contextlib.suppress(Exception):  # best-effort teardown
-            await self._client.quit()
+            async with asyncio.timeout(10):
+                await self._client.quit()
         self._client = None
 
 
@@ -158,6 +183,7 @@ class SftpClient:
                 username=self._config.username,
                 password=self._config.password,
                 known_hosts=None,
+                connect_timeout=CONNECT_TIMEOUT,
             )
             self._sftp = await self._conn.start_sftp_client()
             await self._sftp.chdir(self._config.directory)
@@ -174,7 +200,9 @@ class SftpClient:
         assert self._sftp is not None
         files: list[RemoteFileInfo] = []
         try:
-            for entry in await self._sftp.readdir("."):
+            async with asyncio.timeout(SOCKET_TIMEOUT):
+                entries = await self._sftp.readdir(".")
+            for entry in entries:
                 filename = entry.filename
                 if filename in (".", "..") or entry.attrs.type == 2:  # 2 = directory
                     continue
@@ -185,6 +213,8 @@ class SftpClient:
                         mtime=float(entry.attrs.mtime) if entry.attrs.mtime else None,
                     )
                 )
+        except TimeoutError as err:
+            raise FetchError(_timeout_message("listing")) from err
         except (asyncssh.Error, OSError, ConnectionError) as err:
             raise FetchError(f"listing failed: {err}") from err
         return files
@@ -194,8 +224,11 @@ class SftpClient:
 
         assert self._sftp is not None
         try:
-            async with self._sftp.open(name, "rb") as handle:
-                return await handle.read()
+            async with asyncio.timeout(SOCKET_TIMEOUT):
+                async with self._sftp.open(name, "rb") as handle:
+                    return await handle.read()
+        except TimeoutError as err:
+            raise FetchError(_timeout_message(f"download of {name!r}")) from err
         except (asyncssh.Error, OSError, ConnectionError) as err:
             raise FetchError(f"download of {name!r} failed: {err}") from err
 
@@ -204,7 +237,10 @@ class SftpClient:
 
         assert self._sftp is not None
         try:
-            await self._sftp.remove(name)
+            async with asyncio.timeout(SOCKET_TIMEOUT):
+                await self._sftp.remove(name)
+        except TimeoutError as err:
+            raise FetchError(_timeout_message(f"delete of {name!r}")) from err
         except (asyncssh.Error, OSError, ConnectionError) as err:
             raise FetchError(f"delete of {name!r} failed: {err}") from err
 
@@ -215,6 +251,13 @@ class SftpClient:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
+
+
+def _timeout_message(operation: str) -> str:
+    return (
+        f"{operation} timed out: server stopped responding "
+        f"for {SOCKET_TIMEOUT:.0f}s (will retry on the next poll)"
+    )
 
 
 def _mlsd_time_to_epoch(modify: str | None) -> float | None:
